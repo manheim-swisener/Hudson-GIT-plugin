@@ -3,40 +3,46 @@ package hudson.plugins.git;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
+import hudson.FilePath.FileCallable;
 import hudson.Launcher;
 import hudson.Proc;
-import hudson.FilePath.FileCallable;
-import hudson.matrix.MatrixBuild;
 import hudson.matrix.MatrixRun;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
+import hudson.matrix.MatrixBuild;
 import hudson.model.Action;
 import hudson.model.BuildListener;
+import hudson.model.Result;
+import hudson.model.TaskListener;
+import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.model.Hudson;
 import hudson.model.ParametersAction;
-import hudson.model.Result;
 import hudson.model.Run;
-import hudson.model.TaskListener;
 import hudson.plugins.git.browser.GitWeb;
 import hudson.plugins.git.opt.PreBuildMergeOptions;
-import hudson.plugins.git.util.*;
+import hudson.plugins.git.util.Build;
+import hudson.plugins.git.util.BuildChooser;
+import hudson.plugins.git.util.GerritBuildChooser;
+import hudson.plugins.git.util.GitUtils;
+import hudson.plugins.git.util.IBuildChooser;
+import hudson.plugins.git.util.BuildData;
 import hudson.remoting.VirtualChannel;
 import hudson.scm.ChangeLogParser;
-import hudson.scm.SCM;
 import hudson.scm.SCMDescriptor;
+import hudson.scm.SCM;
 import hudson.util.FormFieldValidator;
 import hudson.util.FormValidation;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.servlet.ServletException;
 
@@ -312,7 +318,7 @@ public class GitSCM extends SCM implements Serializable {
 
 			for (IndexEntry submodule : submodules) {
 				try {
-					RemoteConfig submoduleRemoteRepository = getSubmoduleRepository(remoteRepository, submodule.getFile());
+					RemoteConfig submoduleRemoteRepository = getSubmoduleRepository(workspace, remoteRepository, submodule.getFile());
 
 					File subdir = new File(workspace, submodule.getFile());
 					IGitAPI subGit = new GitAPI(git.getGitExe(), new FilePath(subdir),
@@ -337,9 +343,24 @@ public class GitSCM extends SCM implements Serializable {
 
 	}
 
-	public RemoteConfig getSubmoduleRepository(RemoteConfig orig, String name)
+	public RemoteConfig getSubmoduleRepository(File aWorkspace, RemoteConfig orig, String name) throws IOException
     {
-	    // Attempt to guess the submodule URL??
+		// Read submodule from .gitmodules
+		BufferedReader bfr = new BufferedReader(new FileReader(aWorkspace + File.separator + ".gitmodules"));
+		String line = "";
+		boolean isSubmodule = false;
+		while((line= bfr.readLine()) != null) {
+			line = line.trim();
+			if(line.startsWith("[submodule \"" + name )) {
+				isSubmodule = true;
+			} else if (isSubmodule && line.startsWith("url")) {
+				int index = line.indexOf("=");
+				String refUrl = line.substring(index + 1).trim();
+				return newRemoteConfig(name, refUrl, orig.getFetchRefSpecs().get(0));
+			}
+		}
+
+		// Attempt to guess the submodule URL??
 
         String refUrl = orig.getURIs().get(0).toString();
 
@@ -494,10 +515,10 @@ public class GitSCM extends SCM implements Serializable {
 					}
 
 					// Also do a fetch
-					for (RemoteConfig remoteRepository : getRepositories())
-                    {
-                       fetchFrom(git,localWorkspace,listener,remoteRepository);
-                    }
+//					for (RemoteConfig remoteRepository : getRepositories())
+//                    {
+//                       fetchFrom(git,localWorkspace,listener,remoteRepository);
+//                    }
 
 					if (git.hasGitModules()) {
 						git.submoduleInit();

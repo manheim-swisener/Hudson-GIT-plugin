@@ -3,12 +3,12 @@
   <parent>
     <groupId>org.jvnet.hudson.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>1.322</version>
+    <version>1.345</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>git</artifactId>
-  <version>0.8.3-SNAPSHOT</version>
+  <version>0.8.4-SNAPSHOT</version>
   <packaging>hpi</packaging>
   <name>Hudson GIT plugin</name>
   <description>Integrates Hudson to GIT SCM</description>
