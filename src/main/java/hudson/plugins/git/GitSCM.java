@@ -24,9 +24,11 @@ import hudson.scm.SCM;
 import hudson.scm.SCMDescriptor;
 import hudson.util.FormValidation;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.MalformedURLException;
@@ -459,7 +461,7 @@ public class GitSCM extends SCM implements Serializable {
 
             for (IndexEntry submodule : submodules) {
                 try {
-                    RemoteConfig submoduleRemoteRepository = getSubmoduleRepository(remoteRepository, submodule.getFile());
+                    RemoteConfig submoduleRemoteRepository = getSubmoduleRepository(workspace, remoteRepository, submodule.getFile());
 
                     File subdir = new File(workspace, submodule.getFile());
                     IGitAPI subGit = new GitAPI(git.getGitExe(), new FilePath(subdir),
@@ -487,8 +489,23 @@ public class GitSCM extends SCM implements Serializable {
         return fetched;
     }
 
-    public RemoteConfig getSubmoduleRepository(RemoteConfig orig, String name) {
-        // Attempt to guess the submodule URL??
+    public RemoteConfig getSubmoduleRepository(File aWorkspace, RemoteConfig orig, String name) throws IOException {
+    	// Read submodule from .gitmodules
+    	BufferedReader bfr = new BufferedReader(new FileReader(aWorkspace + File.separator + ".gitmodules"));
+    	String line = "";
+    	boolean isSubmodule = false;
+    	while((line= bfr.readLine()) != null) {
+    		line = line.trim();
+    		if(line.startsWith("[submodule \"" + name )) {
+    			isSubmodule = true;
+    		} else if (isSubmodule && line.startsWith("url")) {
+    			int index = line.indexOf("=");
+    			String refUrl = line.substring(index + 1).trim();
+    			return newRemoteConfig(name, refUrl, orig.getFetchRefSpecs().get(0));
+    		}
+    	}
+
+    	// Attempt to guess the submodule URL??
 
         String refUrl = orig.getURIs().get(0).toString();
 
